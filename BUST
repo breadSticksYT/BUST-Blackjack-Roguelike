@@ -1,0 +1,1031 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
+    <title>BUST: Mobile Edition</title>
+    <style>
+        :root {
+            --bg-color: #0f1512; 
+            --felt-color: #2b503e;
+            --accent: #ffcc00; 
+            --danger: #ff4444;
+            --card-bg: #e6e6e6;
+            --text-main: #fff;
+            --shop-bg: #111;
+            --modal-bg: rgba(0,0,0,0.96);
+        }
+
+        * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
+            background-color: var(--bg-color);
+            color: var(--text-main);
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            height: 100vh; /* Fallback */
+            height: 100dvh; /* Dynamic height for mobile browsers */
+            margin: 0;
+            overflow: hidden;
+            user-select: none;
+            touch-action: manipulation;
+        }
+
+        /* --- LAYOUTS --- */
+        .screen {
+            width: 100%;
+            height: 100%;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            position: absolute;
+            top: 0; left: 0;
+            transition: opacity 0.3s;
+            background: var(--bg-color);
+            z-index: 1;
+            padding-top: env(safe-area-inset-top);
+            padding-bottom: env(safe-area-inset-bottom);
+        }
+        
+        #game-screen { z-index: 5; }
+        .hidden { display: none !important; opacity: 0; }
+
+        /* --- HUD (Responsive Grid) --- */
+        .top-bar {
+            width: 100%;
+            display: grid;
+            grid-template-columns: repeat(3, 1fr);
+            gap: 10px;
+            padding: 10px 15px;
+            background: rgba(0,0,0,0.8);
+            border-bottom: 2px solid #333;
+            font-size: 0.9rem;
+            text-transform: uppercase;
+        }
+        
+        .stat-box { display: flex; flex-direction: column; align-items: center; justify-content: center; }
+        .stat-label { font-size: 0.65rem; color: #888; margin-bottom: 2px; letter-spacing: 0.5px; }
+        .stat-val { color: var(--text-main); font-size: 1.1rem; font-weight: 800; }
+        .stat-accent { color: var(--accent); }
+        .money-display { color: #85bb65; }
+
+        /* --- GAME AREA --- */
+        .game-area {
+            flex: 1;
+            width: 100%;
+            background: radial-gradient(circle, var(--felt-color) 0%, var(--bg-color) 90%);
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            position: relative;
+        }
+
+        .boss-alert {
+            position: absolute;
+            top: 10px;
+            background: var(--danger);
+            color: #000;
+            padding: 8px 20px;
+            font-weight: 900;
+            border-radius: 4px;
+            font-size: 0.9rem;
+            text-transform: uppercase;
+            box-shadow: 0 0 15px var(--danger);
+            animation: pulse 2s infinite;
+            z-index: 10;
+            max-width: 90%;
+            text-align: center;
+        }
+        @keyframes pulse { 0% { opacity: 1; } 50% { opacity: 0.7; } 100% { opacity: 1; } }
+
+        .score-preview {
+            margin-bottom: 10px;
+            text-align: center;
+            background: rgba(0,0,0,0.6);
+            padding: 8px 30px;
+            border-radius: 50px;
+            border: 1px solid rgba(255,255,255,0.2);
+            min-width: 120px;
+        }
+        .preview-total { font-size: 3.5rem; font-weight: 800; color: #fff; line-height: 1; }
+        .preview-math { font-size: 0.85rem; color: #bbb; margin-top: 2px; text-transform: uppercase; letter-spacing: 1px;}
+
+        /* --- CARDS (Fluid Sizing) --- */
+        .cards-container {
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            gap: 8px;
+            height: 180px; /* Reduced for mobile */
+            padding: 10px;
+            width: 100%;
+            perspective: 1000px;
+        }
+
+        .card {
+            /* Responsive Card sizing: 19% of screen width, max 100px */
+            width: 19vw;
+            max-width: 100px;
+            /* Aspect ratio approx 2:3 */
+            height: 28.5vw; 
+            max-height: 150px;
+            
+            background: var(--card-bg);
+            border-radius: 6px;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: space-between;
+            padding: 5px;
+            box-shadow: 0 5px 15px rgba(0,0,0,0.5);
+            color: #111;
+            font-weight: 800;
+            font-size: 1.2rem;
+            transition: transform 0.2s, border-color 0.2s;
+            cursor: pointer;
+            position: relative;
+        }
+        
+        .card.red { color: #d00; }
+        .card.selected { border: 3px solid var(--accent); transform: translateY(-15px); }
+        .card-center { font-size: 2.2rem; }
+        .card-corner.bottom { align-self: flex-end; transform: rotate(180deg); }
+
+        /* --- CONTROLS (Bottom Bar) --- */
+        .controls-area {
+            width: 100%;
+            padding: 15px;
+            padding-bottom: max(20px, env(safe-area-inset-bottom)); /* Lift up on iPhone X+ */
+            display: flex;
+            justify-content: space-between;
+            gap: 10px;
+            background: linear-gradient(to top, #000 20%, rgba(0,0,0,0));
+        }
+        .btn {
+            flex: 1;
+            padding: 18px 0;
+            font-size: 1rem;
+            border: none;
+            border-radius: 8px;
+            font-weight: 900;
+            cursor: pointer;
+            color: #fff;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+            box-shadow: 0 4px 0 rgba(0,0,0,0.5);
+        }
+        .btn:active { transform: translateY(4px); box-shadow: none; }
+        .btn:disabled { opacity: 0.3; filter: grayscale(1); }
+        
+        .btn-hit { background: #2d7dd2; }
+        .btn-stand { background: #ffaa00; color: #111; }
+        .btn-swap { background: #c3073f; }
+        
+        .btn-subtext {
+            display: block;
+            font-size: 0.6rem;
+            font-weight: normal;
+            margin-top: 2px;
+            opacity: 0.8;
+        }
+
+        /* --- OVERLAYS --- */
+        .overlay-text {
+            position: absolute;
+            font-weight: 900;
+            font-size: 4rem; /* Smaller for mobile */
+            pointer-events: none;
+            z-index: 100;
+            text-shadow: 0 5px 10px rgba(0,0,0,0.5);
+        }
+        #bust-text { color: var(--danger); opacity: 0; transition: opacity 0.2s; top: 35%; }
+        #bust-text.active { opacity: 1; }
+
+        /* --- SCREENS --- */
+        .centered-screen { 
+            justify-content: center; 
+            text-align: center; 
+            background: #000;
+            z-index: 50;
+            padding: 20px;
+            overflow-y: auto;
+        }
+
+        .title-big { font-size: 4rem; color: var(--accent); margin: 0; line-height: 1; text-shadow: 0 0 20px var(--accent); }
+        .title-sub { color: #666; font-size: 1rem; margin-bottom: 20px; text-transform: uppercase; letter-spacing: 2px; }
+
+        .deck-select-container { 
+            display: flex; 
+            flex-direction: column; 
+            gap: 15px; 
+            width: 100%; 
+            max-width: 400px;
+        }
+        .deck-card {
+            background: #222;
+            border: 2px solid #444;
+            padding: 20px;
+            border-radius: 12px;
+            cursor: pointer;
+            transition: 0.2s;
+            text-align: left;
+        }
+        .deck-card:active { border-color: var(--accent); background: #2a2a2a; }
+        .deck-name { color: var(--text-main); font-size: 1.3rem; font-weight: bold; margin-bottom: 5px; }
+        .deck-desc { color: #888; font-size: 0.9rem; line-height: 1.3; }
+
+        /* --- SUMMARY MODAL --- */
+        #summary-modal {
+            background: var(--modal-bg);
+            z-index: 60;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            padding: 20px;
+        }
+        .summary-box {
+            background: #1a1a1a;
+            border: 1px solid #444;
+            padding: 30px 20px;
+            width: 100%;
+            max-width: 380px;
+            border-radius: 12px;
+            text-align: center;
+            box-shadow: 0 0 50px rgba(0,0,0,0.8);
+        }
+        .summary-row {
+            display: flex;
+            justify-content: space-between;
+            margin: 12px 0;
+            font-size: 1.1rem;
+            border-bottom: 1px solid #333;
+            padding-bottom: 5px;
+        }
+        .profit-val { color: #85bb65; font-weight: bold; font-size: 1.8rem; }
+        
+        /* --- SHOP STYLES --- */
+        #shop-screen { 
+            background-color: var(--shop-bg); 
+            overflow-y: auto; 
+            padding: 20px;
+            z-index: 200; 
+        }
+        .shop-grid { 
+            display: grid; 
+            grid-template-columns: 1fr; /* 1 Column for Mobile */
+            gap: 15px; 
+            width: 100%;
+            max-width: 500px; 
+            margin: 20px auto;
+            padding-bottom: 80px; /* Space for Next Level button */
+        }
+        .shop-item {
+            background: #252525;
+            padding: 15px;
+            border-radius: 8px;
+            border: 2px solid #333;
+            cursor: pointer;
+            display: flex;
+            flex-direction: row; /* Horizontal Layout for Mobile */
+            align-items: center;
+            justify-content: space-between;
+            min-height: 80px;
+        }
+        .shop-item.locked { opacity: 0.4; filter: grayscale(1); }
+        .shop-item > div:first-child { text-align: left; flex: 1; padding-right: 10px; }
+
+        /* Floating text adjustment */
+        .float-txt {
+            position: absolute;
+            left: 50%; top: 40%;
+            transform: translateX(-50%);
+            font-size: 3rem;
+            font-weight: 900;
+            pointer-events: none;
+            z-index: 100;
+            text-shadow: 0 2px 10px #000;
+            transition: all 0.8s ease-out;
+        }
+
+        /* --- ANIMATIONS --- */
+        .shake { animation: shake 0.4s cubic-bezier(.36,.07,.19,.97) both; }
+        @keyframes shake {
+            10%, 90% { transform: translate3d(-2px, 0, 0); }
+            20%, 80% { transform: translate3d(4px, 0, 0); }
+            30%, 50%, 70% { transform: translate3d(-6px, 0, 0); }
+            40%, 60% { transform: translate3d(6px, 0, 0); }
+        }
+    </style>
+</head>
+<body>
+
+    <div id="start-screen" class="screen centered-screen">
+        <h1 class="title-big">BUST</h1>
+        <div class="title-sub">Mobile Edition v4.0</div>
+        
+        <h3 style="color:#fff; margin-bottom:15px; font-size: 1rem;">SELECT ARCHETYPE</h3>
+        <div class="deck-select-container">
+            <div class="deck-card" onclick="startGame('standard')">
+                <div class="deck-name">The Standard</div>
+                <div class="deck-desc">Balanced deck. <br>4 Hands. 3 Swaps.</div>
+            </div>
+            <div class="deck-card" onclick="startGame('highroller')">
+                <div class="deck-name">High Roller</div>
+                <div class="deck-desc" style="color:#ffcc00">Volatile Deck.</div>
+                <div class="deck-desc">More Faces/Aces. Fewer low cards.</div>
+            </div>
+            <div class="deck-card" onclick="startGame('control')">
+                <div class="deck-name">Control Freak</div>
+                <div class="deck-desc" style="color:#2d7dd2">Tactical Deck.</div>
+                <div class="deck-desc">-1 Hand. +3 Swaps. Starts +$100.</div>
+            </div>
+        </div>
+    </div>
+
+    <div id="game-screen" class="screen hidden">
+        <div class="top-bar">
+            <div class="stat-box">
+                <span class="stat-label">TARGET</span>
+                <span class="stat-val stat-accent" id="target-score">1500</span>
+            </div>
+            <div class="stat-box">
+                <span class="stat-label">SCORE</span>
+                <span class="stat-val" id="current-score">0</span>
+            </div>
+            <div class="stat-box">
+                <span class="stat-label">WALLET</span>
+                <span class="stat-val money-display" id="bank-money">$0</span>
+            </div>
+            <div class="stat-box">
+                <span class="stat-label">LEVEL</span>
+                <span class="stat-val" id="level-num">1</span>
+            </div>
+            <div class="stat-box">
+                <span class="stat-label">HANDS</span>
+                <span class="stat-val" id="hands-left">4</span>
+            </div>
+            <div class="stat-box">
+                <span class="stat-label">SWAPS</span>
+                <span class="stat-val" style="color:#c3073f" id="swaps-left">3</span>
+            </div>
+        </div>
+
+        <div class="game-area" id="game-area">
+            <div id="boss-alert" class="boss-alert hidden">BOSS: THE WALL</div>
+            <div id="bust-text" class="overlay-text">BUST</div>
+            
+            <div class="score-preview">
+                <div class="preview-total" id="hand-sum">0</div>
+                <div class="preview-math" id="hand-math">Ready</div>
+            </div>
+            
+            <div class="cards-container" id="cards-container"></div>
+        </div>
+
+        <div class="controls-area">
+            <button class="btn btn-hit" id="btn-hit" onclick="actionHit()">
+                HIT
+                <span class="btn-subtext" id="hit-subtext">Draw</span>
+            </button>
+            <button class="btn btn-stand" id="btn-stand" onclick="actionStand()">
+                STAND
+                <span class="btn-subtext" id="stand-subtext">Bank</span>
+            </button>
+            <button class="btn btn-swap" id="btn-swap" onclick="actionSwap()">
+                SWAP
+                <span class="btn-subtext">Fix</span>
+            </button>
+        </div>
+    </div>
+
+    <div id="summary-modal" class="screen hidden">
+        <div class="summary-box">
+            <h2 style="color:#fff; margin-top:0;">LEVEL COMPLETE</h2>
+            
+            <div class="summary-row">
+                <span style="color:#888">Total Score</span>
+                <span id="sum-score">2150</span>
+            </div>
+            <div class="summary-row">
+                <span style="color:#ffcc00">Target</span>
+                <span id="sum-target">-1500</span>
+            </div>
+
+            <div id="hidden-bonus-row" class="summary-row hidden" style="border-bottom:none; margin-top:-10px;">
+                <span style="color:#0ff; font-family:monospace;">OFF-BOOKS</span>
+                <span style="color:#0ff; font-family:monospace;">+$300</span>
+            </div>
+            
+            <div style="color:#888; font-size:0.9rem; text-transform:uppercase; margin-top:20px;">NET PROFIT</div>
+            <div class="profit-val" id="sum-profit">+$650</div>
+
+            <div style="margin-top:20px; color:#aaa; font-size:0.85rem; line-height: 1.4;">
+                <p id="greed-message" style="margin-bottom: 5px;">You hesitated.</p>
+                <p id="prediction-text" style="color: var(--danger); font-style: italic;">Projected Failure: Level 5.</p>
+            </div>
+
+            <button id="btn-enter-shop" class="btn btn-hit" style="margin-top:25px; width:100%" onclick="goToShop()">ENTER SHOP</button>
+        </div>
+    </div>
+
+    <div id="shop-screen" class="screen hidden">
+        <div style="text-align:center">
+            <h2 style="color:var(--accent); margin-bottom:5px;">THE BACKROOM</h2>
+            <div style="color:#85bb65; font-size:1.2rem;">Wallet: <span id="shop-money">$0</span></div>
+        </div>
+        
+        <div class="shop-grid" id="shop-items"></div>
+        
+        <div style="position:fixed; bottom:20px; left:0; width:100%; display:flex; justify-content:center; padding: 0 20px;">
+             <button class="btn btn-stand" style="width:100%; max-width:400px; font-size:1.2rem;" onclick="nextLevelSetup()">NEXT LEVEL</button>
+        </div>
+    </div>
+
+    <div id="game-over-screen" class="screen centered-screen hidden">
+        <h1 style="color:var(--danger); font-size:3.5rem; margin:0;">BANKRUPT</h1>
+        <h3 style="color:#fff; font-weight:normal; margin-top:10px;">You were solvent.<br>You weren't ambitious.</h3>
+        
+        <div style="border:1px solid #333; padding:20px; border-radius:10px; width:100%; max-width:300px; margin-top:30px;">
+            <div style="color:#888; font-size: 0.9rem;">LEVEL REACHED</div>
+            <div style="font-size:2rem; font-weight:bold" id="go-level">1</div>
+            <div style="height:15px"></div>
+            <div style="color:#888; font-size: 0.9rem;">FINAL WEALTH</div>
+            <div style="font-size:2rem; font-weight:bold; color:#85bb65" id="go-money">$0</div>
+        </div>
+        <button class="btn btn-hit" style="margin-top:30px; width:100%; max-width:300px;" onclick="location.reload()">MAIN MENU</button>
+    </div>
+
+    <script>
+        // --- AUDIO ENGINE ---
+        const AudioCtx = new (window.AudioContext || window.webkitAudioContext)();
+        
+        function playSound(type, val = 0) {
+            if (AudioCtx.state === 'suspended') AudioCtx.resume();
+            const osc = AudioCtx.createOscillator();
+            const gain = AudioCtx.createGain();
+            osc.connect(gain);
+            gain.connect(AudioCtx.destination);
+
+            const now = AudioCtx.currentTime;
+            
+            if (type === 'hit') {
+                if (val >= 20) {
+                     // Silence/Thud for 20
+                     osc.type = 'triangle';
+                     osc.frequency.setValueAtTime(80, now);
+                     gain.gain.setValueAtTime(0.1, now);
+                     gain.gain.exponentialRampToValueAtTime(0.01, now + 0.05);
+                } else {
+                    let baseFreq = 300 + (val * 15);
+                    osc.type = 'triangle';
+                    osc.frequency.setValueAtTime(baseFreq, now);
+                    osc.frequency.exponentialRampToValueAtTime(50, now + 0.1);
+                    gain.gain.setValueAtTime(0.1, now);
+                    gain.gain.exponentialRampToValueAtTime(0.01, now + 0.1);
+                }
+                osc.start(now);
+                osc.stop(now + 0.1);
+
+            } else if (type === 'select') {
+                osc.type = 'sine';
+                osc.frequency.setValueAtTime(600, now);
+                gain.gain.setValueAtTime(0.05, now);
+                gain.gain.exponentialRampToValueAtTime(0.01, now + 0.05);
+                osc.start(now);
+                osc.stop(now + 0.05);
+            } else if (type === 'bust') {
+                osc.type = 'sawtooth';
+                osc.frequency.setValueAtTime(100, now);
+                osc.frequency.linearRampToValueAtTime(50, now + 0.3);
+                gain.gain.setValueAtTime(0.2, now);
+                gain.gain.linearRampToValueAtTime(0, now + 0.3);
+                osc.start(now);
+                osc.stop(now + 0.3);
+            } else if (type === 'cash') {
+                osc.type = 'square';
+                osc.frequency.setValueAtTime(800, now);
+                osc.frequency.setValueAtTime(1200, now + 0.1);
+                gain.gain.setValueAtTime(0.05, now);
+                gain.gain.linearRampToValueAtTime(0, now + 0.2);
+                osc.start(now);
+                osc.stop(now + 0.2);
+            }
+        }
+
+        // --- DATA ---
+        const SUITS = ['♠', '♥', '♣', '♦'];
+        const RANKS = ['2', '3', '4', '5', '6', '7', '8', '9', '10', 'J', 'Q', 'K', 'A'];
+        
+        const UPGRADES_DB = [
+            { id: 'extra_hand', name: 'Backup Plan', desc: '+1 Hand/Lvl', cost: 600, type: 'stackable' },
+            { id: 'extra_swap', name: 'Sleight', desc: '+2 Swaps/Lvl', cost: 400, type: 'stackable' },
+            { id: 'inflation', name: 'Inflation', desc: '+5% Chip Val', cost: 350, type: 'stackable' },
+            { id: 'insurance', name: 'Insurance', desc: '$100 on BUST', cost: 300, type: 'stackable' },
+            
+            { id: 'safety_net', name: 'Safety Net', desc: 'Ignore 1st Bust', cost: 1200, type: 'unique' },
+            { id: 'risk_taker', name: 'Risk Taker', desc: 'Ignore <17 rule', cost: 600, type: 'unique' },
+            { id: 'black_jackpot', name: 'Black Jackpot', desc: '21 pays 15x', cost: 1000, type: 'unique' },
+            { id: 'charlie_easy', name: '4-Card Stud', desc: 'Charlie @ 4 cards', cost: 900, type: 'unique' },
+            { id: 'face_value', name: 'Royalty', desc: 'Faces +50 chips', cost: 450, type: 'unique' },
+            { id: 'ace_magnet', name: 'Ace Magnet', desc: '+2 Aces to deck', cost: 600, type: 'unique' },
+        ];
+
+        // --- GAME STATE ---
+        let gameState = {
+            archetype: 'standard',
+            level: 1,
+            targetScore: 1500,
+            currentScore: 0,
+            money: 0,
+            upgrades: {},
+            deck: [],
+            hand: [],
+            handsLeft: 4,
+            swapsLeft: 3,
+            selectedIndex: null,
+            bossMod: null,
+            lastBoss: null, 
+            safetyNetUsed: false,
+            auditorPenalty: false
+        };
+
+        // --- INITIALIZATION ---
+        function showScreen(id) {
+            document.querySelectorAll('.screen').forEach(s => s.classList.add('hidden'));
+            document.getElementById(id).classList.remove('hidden');
+        }
+
+        function startGame(archetype) {
+            gameState.archetype = archetype;
+            gameState.level = 1;
+            gameState.targetScore = 1500;
+            gameState.money = archetype === 'control' ? 100 : 0;
+            gameState.upgrades = {};
+            gameState.lastBoss = null;
+            gameState.auditorPenalty = false;
+            
+            playSound('cash');
+            startLevel();
+        }
+
+        function startLevel() {
+            showScreen('game-screen');
+            gameState.currentScore = 0;
+            gameState.safetyNetUsed = false;
+            
+            let baseHands = 4;
+            let baseSwaps = 3;
+            if(gameState.archetype === 'control') { baseHands = 3; baseSwaps = 6; }
+            
+            gameState.handsLeft = baseHands + (getUpgradeCount('extra_hand') * 1);
+            gameState.swapsLeft = baseSwaps + (getUpgradeCount('extra_swap') * 2);
+
+            // Boss Check
+            gameState.bossMod = null;
+            const bossAlert = document.getElementById('boss-alert');
+            bossAlert.classList.add('hidden');
+            
+            if (gameState.level % 3 === 0) {
+                const bossPool = ['wall', 'fog', 'tax', 'auditor'];
+                let selectedBoss = '';
+                do {
+                    selectedBoss = bossPool[Math.floor(Math.random() * bossPool.length)];
+                } while (selectedBoss === gameState.lastBoss && bossPool.length > 1);
+                
+                gameState.bossMod = selectedBoss;
+                gameState.lastBoss = selectedBoss;
+                
+                let bossName = "";
+                if(gameState.bossMod === 'wall') bossName = "THE WALL (Stand 18+)";
+                if(gameState.bossMod === 'fog') bossName = "THE FOG (Hidden)";
+                if(gameState.bossMod === 'tax') bossName = "THE TAX ($50/Hit)";
+                if(gameState.bossMod === 'auditor') bossName = "AUDITOR (Debt)";
+                
+                bossAlert.innerText = "BOSS: " + bossName;
+                bossAlert.classList.remove('hidden');
+            }
+
+            createDeck();
+            updateHUD();
+            startHand();
+        }
+
+        function createDeck() {
+            gameState.deck = [];
+            let localRanks = [...RANKS];
+            if (gameState.archetype === 'highroller') {
+                localRanks = ['4','5','6','7','8','9','10','10','J','Q','K','A','A'];
+            }
+            for (let s of SUITS) {
+                for (let r of localRanks) {
+                    gameState.deck.push({ suit: s, rank: r, value: getCardValue(r) });
+                }
+            }
+            if(hasUpgrade('ace_magnet')) {
+                gameState.deck.push({suit:'♠', rank:'A', value:11}, {suit:'♥', rank:'A', value:11});
+            }
+            shuffleDeck();
+        }
+
+        function shuffleDeck() {
+            for (let i = gameState.deck.length - 1; i > 0; i--) {
+                const j = Math.floor(Math.random() * (i + 1));
+                [gameState.deck[i], gameState.deck[j]] = [gameState.deck[j], gameState.deck[i]];
+            }
+        }
+
+        function getCardValue(rank) {
+            if (['J', 'Q', 'K'].includes(rank)) return 10;
+            if (rank === 'A') return 11;
+            return parseInt(rank);
+        }
+
+        // --- HAND LOGIC ---
+        function startHand() {
+            gameState.hand = [];
+            gameState.selectedIndex = null;
+            document.getElementById('bust-text').classList.remove('active');
+            
+            if (gameState.handsLeft <= 0) {
+                checkLevelEnd();
+                return;
+            }
+
+            drawCard(false);
+            drawCard(false);
+            updateHUD();
+            toggleControls(true);
+        }
+
+        function drawCard(animate = true) {
+            if (gameState.deck.length === 0) createDeck();
+            const card = gameState.deck.pop();
+            card.isNew = animate;
+            gameState.hand.push(card);
+            renderHand();
+            checkBust();
+        }
+
+        function renderHand() {
+            const container = document.getElementById('cards-container');
+            container.innerHTML = '';
+            
+            gameState.hand.forEach((card, index) => {
+                const el = document.createElement('div');
+                el.className = 'card';
+                if(['♥','♦'].includes(card.suit)) el.classList.add('red');
+                if(index === gameState.selectedIndex) el.classList.add('selected');
+                
+                el.onclick = () => {
+                    playSound('select');
+                    toggleSelect(index);
+                };
+                
+                // Simplified inner HTML for mobile
+                el.innerHTML = `
+                    <div style="font-size:0.8rem; align-self:flex-start">${card.rank}</div>
+                    <div class="card-center">${card.suit}</div>
+                    <div style="font-size:0.8rem; align-self:flex-end; transform:rotate(180deg)">${card.rank}</div>
+                `;
+                container.appendChild(el);
+            });
+        }
+
+        function toggleSelect(index) {
+            if(gameState.selectedIndex === index) gameState.selectedIndex = null;
+            else gameState.selectedIndex = index;
+            
+            const cards = document.querySelectorAll('.card');
+            cards.forEach((c, i) => {
+                if(i === gameState.selectedIndex) c.classList.add('selected');
+                else c.classList.remove('selected');
+            });
+            updateHUD();
+        }
+
+        // --- CALCULATIONS ---
+        function calculateState() {
+            let sum = 0;
+            let aces = 0;
+            let faces = 0;
+
+            gameState.hand.forEach(c => {
+                sum += c.value;
+                if(c.rank === 'A') aces++;
+                if(['J','Q','K'].includes(c.rank)) faces++;
+            });
+
+            while(sum > 21 && aces > 0) { sum -= 10; aces--; }
+
+            let chips = sum * 10;
+            if(hasUpgrade('face_value')) chips += (faces * 50);
+            
+            const infl = getUpgradeCount('inflation');
+            if(infl > 0) chips = Math.floor(chips * (1 + (infl * 0.05)));
+
+            let mult = 1;
+            let label = "SAFE";
+            let color = "#fff";
+
+            if (sum > 21) {
+                mult = 0; label = "BUST"; color = "var(--danger)";
+            } else if (sum === 21) {
+                mult = hasUpgrade('black_jackpot') ? 15 : 10; 
+                label = "JACKPOT"; color = "var(--accent)";
+            } else if (sum >= 17) {
+                if(sum === 20) { mult = 4; label = "GREAT"; }
+                else if(sum === 19) { mult = 2; label = "GOOD"; }
+                else { mult = 1.5; label = "OK"; }
+            } else {
+                if(hasUpgrade('risk_taker')) {
+                    mult = 1; label = "SAFE";
+                } else {
+                    mult = 0.5; label = "COWARD"; color = "#aaa";
+                }
+            }
+
+            const charlieReq = hasUpgrade('charlie_easy') ? 4 : 5;
+            if(gameState.hand.length >= charlieReq && sum <= 21) {
+                mult = 20; label = "CHARLIE"; color = "var(--accent)";
+            }
+
+            let canStand = true;
+            if (gameState.bossMod === 'wall' && sum < 18 && sum <= 21) canStand = false;
+            
+            let displaySum = sum;
+            if (gameState.bossMod === 'fog') displaySum = "???";
+
+            if (gameState.bossMod === 'auditor' && sum < 18 && sum <= 21 && !hasUpgrade('risk_taker')) {
+                label = "AUDITED";
+                color = "#0ff";
+            }
+
+            return { sum, displaySum, chips, mult, label, color, canStand, total: Math.floor(chips * mult) };
+        }
+
+        // --- ACTIONS ---
+        function actionHit() {
+            if(gameState.bossMod === 'tax') {
+                gameState.currentScore -= 50; 
+                showFloatingText("-50", "#f00");
+            }
+            drawCard(true);
+            const state = calculateState();
+            playSound('hit', state.sum);
+            updateHUD();
+        }
+
+        function actionStand() {
+            const state = calculateState();
+            if(!state.canStand || state.sum > 21) return;
+
+            if (gameState.bossMod === 'auditor' && state.sum < 18) {
+                gameState.auditorPenalty = true;
+                showFloatingText("AUDITED", "#0ff");
+            }
+
+            if(state.sum === 21) shakeScreen();
+            
+            playSound('cash');
+            gameState.currentScore += state.total;
+            showFloatingText(`+${state.total}`, state.color);
+            endHand();
+        }
+
+        function actionSwap() {
+            if(gameState.selectedIndex === null || gameState.swapsLeft <= 0) return;
+            playSound('hit', 10);
+            const card = gameState.deck.pop();
+            card.isNew = true;
+            gameState.hand[gameState.selectedIndex] = card;
+            gameState.swapsLeft--;
+            gameState.selectedIndex = null;
+            if(gameState.deck.length === 0) createDeck();
+            renderHand();
+            checkBust();
+            updateHUD();
+        }
+
+        function checkBust() {
+            const state = calculateState();
+            if (state.sum > 21) {
+                if(hasUpgrade('safety_net') && !gameState.safetyNetUsed) {
+                    gameState.safetyNetUsed = true;
+                    showFloatingText("SAVED!", "#4ecca3");
+                    gameState.hand.pop();
+                    renderHand();
+                    return;
+                }
+
+                playSound('bust');
+                shakeScreen();
+                document.getElementById('bust-text').classList.add('active');
+                
+                const ins = getUpgradeCount('insurance');
+                if(ins > 0) gameState.money += (100 * ins);
+
+                toggleControls(false);
+                setTimeout(() => {
+                    gameState.handsLeft--;
+                    updateHUD();
+                    if(gameState.handsLeft > 0) startHand();
+                    else checkLevelEnd();
+                }, 1500);
+            }
+        }
+
+        function endHand() {
+            gameState.handsLeft--;
+            updateHUD();
+            toggleControls(false);
+            if(gameState.currentScore >= gameState.targetScore) {
+                setTimeout(showSummary, 1000); 
+            } else {
+                setTimeout(startHand, 1000);
+            }
+        }
+
+        function checkLevelEnd() {
+            if(gameState.currentScore >= gameState.targetScore) showSummary();
+            else gameOver();
+        }
+
+        function shakeScreen() {
+            const area = document.getElementById('game-area');
+            area.classList.remove('shake');
+            void area.offsetWidth;
+            area.classList.add('shake');
+        }
+
+        function showFloatingText(txt, col) {
+            const el = document.createElement('div');
+            el.className = 'float-txt';
+            el.innerText = txt;
+            el.style.color = col;
+            document.body.appendChild(el);
+            
+            setTimeout(() => {
+                el.style.transform = 'translate(-50%, -120px)';
+                el.style.opacity = '0';
+            }, 50);
+            setTimeout(() => el.remove(), 1000);
+        }
+
+        // --- HUD UPDATES ---
+        function updateHUD() {
+            const state = calculateState();
+            
+            document.getElementById('level-num').innerText = gameState.level;
+            document.getElementById('target-score').innerText = gameState.targetScore;
+            document.getElementById('current-score').innerText = gameState.currentScore;
+            document.getElementById('hands-left').innerText = gameState.handsLeft;
+            document.getElementById('swaps-left').innerText = gameState.swapsLeft;
+            document.getElementById('bank-money').innerText = `$${gameState.money}`;
+
+            if(state.sum <= 21) {
+                document.getElementById('hand-sum').innerText = state.displaySum;
+                document.getElementById('hand-math').innerText = `${state.chips} x ${state.mult} = ${state.total}`;
+                document.getElementById('hand-math').style.color = state.color;
+            }
+
+            const isBusted = state.sum > 21;
+            document.getElementById('btn-hit').disabled = isBusted;
+            
+            const standBtn = document.getElementById('btn-stand');
+            standBtn.disabled = isBusted || !state.canStand;
+            
+            const standSub = document.getElementById('stand-subtext');
+            if (state.label === "COWARD") {
+                standSub.innerText = "COWARD (0.5x)";
+                standBtn.style.backgroundColor = "#555";
+            } else if (state.label === "AUDITED") {
+                standSub.innerText = "PENALTY";
+                standBtn.style.backgroundColor = "#0aa";
+            } else if (!state.canStand) {
+                standSub.innerText = "LOCKED";
+                standBtn.style.backgroundColor = "#333";
+            } else {
+                standSub.innerText = "BANK";
+                standBtn.style.backgroundColor = "#ffaa00";
+            }
+
+            document.getElementById('btn-swap').disabled = !(gameState.swapsLeft > 0 && gameState.selectedIndex !== null && !isBusted);
+        }
+
+        function toggleControls(enable) {
+            document.querySelectorAll('.controls-area .btn').forEach(b => b.disabled = !enable);
+        }
+
+        // --- SUMMARY & SHOP ---
+        function showSummary() {
+            const profit = Math.max(0, gameState.currentScore - gameState.targetScore);
+            
+            document.getElementById('sum-score').innerText = gameState.currentScore;
+            document.getElementById('sum-target').innerText = `-${gameState.targetScore}`;
+            document.getElementById('sum-profit').innerText = profit > 0 ? `+$${profit}` : "$0";
+            
+            const bonusRow = document.getElementById('hidden-bonus-row');
+            if (gameState.currentScore >= (gameState.targetScore * 1.5)) {
+                gameState.money += 300;
+                bonusRow.classList.remove('hidden');
+                setTimeout(() => playSound('cash'), 500);
+            } else {
+                bonusRow.classList.add('hidden');
+            }
+
+            const msg = document.getElementById('greed-message');
+            if(profit === 0) msg.innerText = "Minimum effort.";
+            else if(profit < 200) msg.innerText = "Coward's profit.";
+            else if(profit > 800) msg.innerText = "Excellent greed.";
+            else msg.innerText = "Acceptable.";
+
+            const pred = document.getElementById('prediction-text');
+            const projectedFail = Math.floor(gameState.money / 300) + gameState.level + 2; 
+            
+            if (gameState.money > 2000) {
+                 pred.innerText = "Outlook: STABLE.";
+                 pred.style.color = "#85bb65";
+            } else {
+                 pred.innerText = `Projected Failure: Level ${projectedFail}.`;
+                 pred.style.color = "var(--danger)";
+            }
+
+            gameState.money += profit;
+            document.getElementById('btn-enter-shop').disabled = false;
+            showScreen('summary-modal');
+        }
+
+        function goToShop() {
+            document.getElementById('summary-modal').classList.add('hidden');
+            showScreen('shop-screen');
+            document.getElementById('shop-money').innerText = `$${gameState.money}`;
+            
+            if (!gameState.upgrades) gameState.upgrades = {};
+
+            const pool = UPGRADES_DB.filter(u => !(u.type === 'unique' && hasUpgrade(u.id)));
+            const shopItems = [];
+            const temp = [...pool];
+            for(let i=0; i<3; i++) {
+                if(temp.length) {
+                    const r = Math.floor(Math.random() * temp.length);
+                    shopItems.push(temp[r]);
+                    temp.splice(r,1);
+                }
+            }
+
+            const container = document.getElementById('shop-items');
+            container.innerHTML = '';
+            shopItems.forEach(item => {
+                const el = document.createElement('div');
+                el.className = 'shop-item';
+                if(gameState.money < item.cost) el.classList.add('locked');
+                
+                el.onclick = () => {
+                    if(gameState.money >= item.cost) {
+                        playSound('cash');
+                        gameState.money -= item.cost;
+                        if(!gameState.upgrades[item.id]) gameState.upgrades[item.id]=0;
+                        gameState.upgrades[item.id]++;
+                        
+                        el.classList.add('sold');
+                        el.style.opacity = '0.5';
+                        el.innerHTML = `<div style="text-align:center; width:100%; color:#555; font-weight:900;">SOLD</div>`;
+                        document.getElementById('shop-money').innerText = `$${gameState.money}`;
+                    }
+                };
+
+                el.innerHTML = `
+                    <div style="flex:1">
+                        <div style="font-size:1.1rem; color:var(--accent); font-weight:bold">${item.name}</div>
+                        <div style="color:#aaa; font-size:0.8rem;">${item.desc}</div>
+                    </div>
+                    <div style="color:#85bb65; font-weight:bold; font-size:1.1rem;">$${item.cost}</div>
+                `;
+                container.appendChild(el);
+            });
+        }
+
+        function nextLevelSetup() {
+            gameState.level++;
+            gameState.targetScore = Math.floor(gameState.targetScore * 1.35);
+            if (gameState.auditorPenalty) {
+                gameState.targetScore = Math.floor(gameState.targetScore * 1.2); 
+            }
+            startLevel();
+        }
+
+        function hasUpgrade(id) { return (gameState.upgrades[id] && gameState.upgrades[id] > 0); }
+        function getUpgradeCount(id) { return gameState.upgrades[id] || 0; }
+        
+        function gameOver() {
+            showScreen('game-over-screen');
+            document.getElementById('go-level').innerText = gameState.level;
+            document.getElementById('go-money').innerText = `$${gameState.money}`;
+            playSound('bust');
+        }
+    </script>
+</body>
+</html>
